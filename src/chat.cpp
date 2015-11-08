@@ -692,6 +692,8 @@ void ChatBackend::addUnparsedMessage(std::wstring message)
 	// TODO: Remove the need to parse chat messages client-side, by sending
 	// separate name and text fields in TOCLIENT_CHAT_MESSAGE.
 
+                std::wcout<<message;
+
 	if (message.size() >= 2 && message[0] == L'<')
 	{
 		std::size_t closing = message.find_first_of(L'>', 1);
