@@ -18,11 +18,11 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 */
 
 #ifdef _MSC_VER
-#ifndef SERVER // Dedicated server isn't linked with Irrlicht
-	#pragma comment(lib, "Irrlicht.lib")
-	// This would get rid of the console window
-	//#pragma comment(linker, "/subsystem:windows /ENTRY:mainCRTStartup")
-#endif
+	#ifndef SERVER // Dedicated server isn't linked with Irrlicht
+		#pragma comment(lib, "Irrlicht.lib")
+		// This would get rid of the console window
+		//#pragma comment(linker, "/subsystem:windows /ENTRY:mainCRTStartup")
+	#endif
 	#pragma comment(lib, "zlibwapi.lib")
 	#pragma comment(lib, "Shell32.lib")
 #endif
@@ -59,7 +59,14 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 #endif
 
 #ifdef HAVE_TOUCHSCREENGUI
-#include "touchscreengui.h"
+	#include "touchscreengui.h"
+#endif
+
+#if !defined(SERVER) && \
+	(IRRLICHT_VERSION_MAJOR == 1) && \
+	(IRRLICHT_VERSION_MINOR == 8) && \
+	(IRRLICHT_VERSION_REVISION == 2)
+	#error "Irrlicht 1.8.2 is known to be broken - please update Irrlicht to version >= 1.8.3"
 #endif
 
 #define DEBUGFILE "debug.txt"
@@ -157,7 +164,13 @@ int main(int argc, char *argv[])
 	setup_log_params(cmd_args);
 
 	porting::signal_handler_init();
+
+#ifdef __ANDROID__
+	porting::initAndroid();
+	porting::initializePathsAndroid();
+#else
 	porting::initializePaths();
+#endif
 
 	if (!create_userdata_path()) {
 		errorstream << "Cannot create user data directory" << std::endl;
@@ -415,9 +428,6 @@ static bool create_userdata_path()
 	bool success;
 
 #ifdef __ANDROID__
-	porting::initAndroid();
-
-	porting::setExternalStorageDir(porting::jnienv);
 	if (!fs::PathExists(porting::path_user)) {
 		success = fs::CreateDir(porting::path_user);
 	} else {
@@ -428,9 +438,6 @@ static bool create_userdata_path()
 	// Create user data directory
 	success = fs::CreateDir(porting::path_user);
 #endif
-
-	infostream << "path_share = " << porting::path_share << std::endl;
-	infostream << "path_user  = " << porting::path_user << std::endl;
 
 	return success;
 }

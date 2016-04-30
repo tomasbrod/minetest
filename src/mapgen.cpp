@@ -41,11 +41,12 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 #include "log.h"
 
 FlagDesc flagdesc_mapgen[] = {
-	{"trees",    MG_TREES},
-	{"caves",    MG_CAVES},
-	{"dungeons", MG_DUNGEONS},
-	{"flat",     MG_FLAT},
-	{"light",    MG_LIGHT},
+	{"trees",       MG_TREES},
+	{"caves",       MG_CAVES},
+	{"dungeons",    MG_DUNGEONS},
+	{"flat",        MG_FLAT},
+	{"light",       MG_LIGHT},
+	{"decorations", MG_DECORATIONS},
 	{NULL,       0}
 };
 
@@ -245,14 +246,31 @@ void Mapgen::lightSpread(VoxelArea &a, v3s16 p, u8 light)
 		return;
 
 	u32 vi = vm->m_area.index(p);
-	MapNode &nn = vm->m_data[vi];
+	MapNode &n = vm->m_data[vi];
 
-	light--;
-	// should probably compare masked, but doesn't seem to make a difference
-	if (light <= nn.param1 || !ndef->get(nn).light_propagates)
+	// Decay light in each of the banks separately
+	u8 light_day = light & 0x0F;
+	if (light_day > 0)
+		light_day -= 0x01;
+
+	u8 light_night = light & 0xF0;
+	if (light_night > 0)
+		light_night -= 0x10;
+
+	// Bail out only if we have no more light from either bank to propogate, or
+	// we hit a solid block that light cannot pass through.
+	if ((light_day  <= (n.param1 & 0x0F) &&
+		light_night <= (n.param1 & 0xF0)) ||
+		!ndef->get(n).light_propagates)
 		return;
 
-	nn.param1 = light;
+	// Since this recursive function only terminates when there is no light from
+	// either bank left, we need to take the max of both banks into account for
+	// the case where spreading has stopped for one light bank but not the other.
+	light = MYMAX(light_day, n.param1 & 0x0F) |
+			MYMAX(light_night, n.param1 & 0xF0);
+
+	n.param1 = light;
 
 	lightSpread(a, p + v3s16(0, 0, 1), light);
 	lightSpread(a, p + v3s16(0, 1, 0), light);
@@ -263,42 +281,28 @@ void Mapgen::lightSpread(VoxelArea &a, v3s16 p, u8 light)
 }
 
 
-void Mapgen::calcLighting(v3s16 nmin, v3s16 nmax, v3s16 full_nmin, v3s16 full_nmax)
+void Mapgen::calcLighting(v3s16 nmin, v3s16 nmax, v3s16 full_nmin, v3s16 full_nmax,
+	bool propagate_shadow)
 {
 	ScopeProfiler sp(g_profiler, "EmergeThread: mapgen lighting update", SPT_AVG);
 	//TimeTaker t("updateLighting");
 
-	propagateSunlight(nmin, nmax);
+	propagateSunlight(nmin, nmax, propagate_shadow);
 	spreadLight(full_nmin, full_nmax);
 
 	//printf("updateLighting: %dms\n", t.stop());
 }
 
 
-
-void Mapgen::calcLighting(v3s16 nmin, v3s16 nmax)
-{
-	ScopeProfiler sp(g_profiler, "EmergeThread: mapgen lighting update", SPT_AVG);
-	//TimeTaker t("updateLighting");
-
-	propagateSunlight(
-		nmin - v3s16(1, 1, 1) * MAP_BLOCKSIZE,
-		nmax + v3s16(1, 0, 1) * MAP_BLOCKSIZE);
-
-	spreadLight(
-		nmin - v3s16(1, 1, 1) * MAP_BLOCKSIZE,
-		nmax + v3s16(1, 1, 1) * MAP_BLOCKSIZE);
-
-	//printf("updateLighting: %dms\n", t.stop());
-}
-
-
-void Mapgen::propagateSunlight(v3s16 nmin, v3s16 nmax)
+void Mapgen::propagateSunlight(v3s16 nmin, v3s16 nmax, bool propagate_shadow)
 {
 	//TimeTaker t("propagateSunlight");
 	VoxelArea a(nmin, nmax);
 	bool block_is_underground = (water_level >= nmax.Y);
 	v3s16 em = vm->m_area.getExtent();
+
+	// NOTE: Direct access to the low 4 bits of param1 is okay here because,
+	// by definition, sunlight will never be in the night lightbank.
 
 	for (int z = a.MinEdge.Z; z <= a.MaxEdge.Z; z++) {
 		for (int x = a.MinEdge.X; x <= a.MaxEdge.X; x++) {
@@ -307,7 +311,8 @@ void Mapgen::propagateSunlight(v3s16 nmin, v3s16 nmax)
 			if (vm->m_data[i].getContent() == CONTENT_IGNORE) {
 				if (block_is_underground)
 					continue;
-			} else if ((vm->m_data[i].param1 & 0x0F) != LIGHT_SUN) {
+			} else if ((vm->m_data[i].param1 & 0x0F) != LIGHT_SUN &&
+					propagate_shadow) {
 				continue;
 			}
 			vm->m_area.add_y(em, i, -1);
@@ -325,7 +330,6 @@ void Mapgen::propagateSunlight(v3s16 nmin, v3s16 nmax)
 }
 
 
-
 void Mapgen::spreadLight(v3s16 nmin, v3s16 nmax)
 {
 	//TimeTaker t("spreadLight");
@@ -336,15 +340,21 @@ void Mapgen::spreadLight(v3s16 nmin, v3s16 nmax)
 			u32 i = vm->m_area.index(a.MinEdge.X, y, z);
 			for (int x = a.MinEdge.X; x <= a.MaxEdge.X; x++, i++) {
 				MapNode &n = vm->m_data[i];
-				if (n.getContent() == CONTENT_IGNORE ||
-					!ndef->get(n).light_propagates)
+				if (n.getContent() == CONTENT_IGNORE)
 					continue;
 
-				u8 light_produced = ndef->get(n).light_source & 0x0F;
-				if (light_produced)
-					n.param1 = light_produced;
+				const ContentFeatures &cf = ndef->get(n);
+				if (!cf.light_propagates)
+					continue;
 
-				u8 light = n.param1 & 0x0F;
+				// TODO(hmmmmm): Abstract away direct param1 accesses with a
+				// wrapper, but something lighter than MapNode::get/setLight
+
+				u8 light_produced = cf.light_source;
+				if (light_produced)
+					n.param1 = light_produced | (light_produced << 4);
+
+				u8 light = n.param1;
 				if (light) {
 					lightSpread(a, v3s16(x,     y,     z + 1), light);
 					lightSpread(a, v3s16(x,     y + 1, z    ), light);

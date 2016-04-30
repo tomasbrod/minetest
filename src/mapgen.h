@@ -29,11 +29,12 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 #define DEFAULT_MAPGEN "v6"
 
 /////////////////// Mapgen flags
-#define MG_TREES         0x01
-#define MG_CAVES         0x02
-#define MG_DUNGEONS      0x04
-#define MG_FLAT          0x08
-#define MG_LIGHT         0x10
+#define MG_TREES       0x01
+#define MG_CAVES       0x02
+#define MG_DUNGEONS    0x04
+#define MG_FLAT        0x08
+#define MG_LIGHT       0x10
+#define MG_DECORATIONS 0x20
 
 class Settings;
 class MMVManip;
@@ -126,7 +127,7 @@ struct MapgenParams {
 		chunksize(5),
 		seed(0),
 		water_level(1),
-		flags(MG_TREES | MG_CAVES | MG_LIGHT),
+		flags(MG_CAVES | MG_LIGHT | MG_DECORATIONS),
 		np_biome_heat(NoiseParams(50, 50, v3f(750.0, 750.0, 750.0), 5349, 3, 0.5, 2.0)),
 		np_biome_heat_blend(NoiseParams(0, 1.5, v3f(8.0, 8.0, 8.0), 13, 2, 1.0, 2.0)),
 		np_biome_humidity(NoiseParams(50, 50, v3f(750.0, 750.0, 750.0), 842, 3, 0.5, 2.0)),
@@ -172,16 +173,20 @@ public:
 
 	void setLighting(u8 light, v3s16 nmin, v3s16 nmax);
 	void lightSpread(VoxelArea &a, v3s16 p, u8 light);
-
-	void calcLighting(v3s16 nmin, v3s16 nmax);
-	void calcLighting(v3s16 nmin, v3s16 nmax,
-		v3s16 full_nmin, v3s16 full_nmax);
-
-	void propagateSunlight(v3s16 nmin, v3s16 nmax);
+	void calcLighting(v3s16 nmin, v3s16 nmax, v3s16 full_nmin, v3s16 full_nmax,
+		bool propagate_shadow = true);
+	void propagateSunlight(v3s16 nmin, v3s16 nmax, bool propagate_shadow);
 	void spreadLight(v3s16 nmin, v3s16 nmax);
 
 	virtual void makeChunk(BlockMakeData *data) {}
 	virtual int getGroundLevelAtPoint(v2s16 p) { return 0; }
+
+	// getSpawnLevelAtPoint() is a function within each mapgen that returns a
+	// suitable y co-ordinate for player spawn ('suitable' usually meaning
+	// within 16 nodes of water_level). If a suitable spawn level cannot be
+	// found at the specified (X, Z) 'MAX_MAP_GENERATION_LIMIT' is returned to
+	// signify this and to cause Server::findSpawnPos() to try another (X, Z).
+	virtual int getSpawnLevelAtPoint(v2s16 p) { return 0; }
 
 private:
 	DISABLE_CLASS_COPY(Mapgen);

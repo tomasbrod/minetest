@@ -33,7 +33,7 @@ struct ObjectProperties
 	bool physical;
 	bool collideWithObjects;
 	float weight;
-	core::aabbox3d<f32> collisionbox;
+	aabb3f collisionbox;
 	std::string visual;
 	std::string mesh;
 	v2f visual_size;
@@ -48,7 +48,10 @@ struct ObjectProperties
 	bool automatic_face_movement_dir;
 	f32 automatic_face_movement_dir_offset;
 	bool backface_culling;
-
+	std::string nametag;
+	video::SColor nametag_color;
+	f32 automatic_face_movement_max_rotation_per_sec;
+	std::string infotext;
 
 	ObjectProperties();
 	std::string dump();

@@ -201,6 +201,9 @@ bool ClientLauncher::run(GameParams &game_params, const Settings &cmd_args)
 			bool game_has_run = launch_game(error_message, reconnect_requested,
 				game_params, cmd_args);
 
+			// Reset the reconnect_requested flag
+			reconnect_requested = false;
+
 			// If skip_main_menu, we only want to startup once
 			if (skip_main_menu && !first_loop)
 				break;
@@ -336,6 +339,7 @@ bool ClientLauncher::launch_game(std::string &error_message,
 	MainMenuData menudata;
 	menudata.address                         = address;
 	menudata.name                            = playername;
+	menudata.password                        = password;
 	menudata.port                            = itos(game_params.socket_port);
 	menudata.script_data.errormessage        = error_message;
 	menudata.script_data.reconnect_requested = reconnect_requested;
@@ -512,6 +516,9 @@ bool ClientLauncher::create_engine_device()
 	u16 bits = g_settings->getU16("fullscreen_bpp");
 	u16 fsaa = g_settings->getU16("fsaa");
 
+	// stereo buffer required for pageflip stereo
+	bool stereo_buffer = g_settings->get("3d_mode") == "pageflip";
+
 	// Determine driver
 	video::E_DRIVER_TYPE driverType = video::EDT_OPENGL;
 	std::string driverstring = g_settings->get("video_driver");
@@ -537,9 +544,11 @@ bool ClientLauncher::create_engine_device()
 	params.AntiAlias     = fsaa;
 	params.Fullscreen    = fullscreen;
 	params.Stencilbuffer = false;
+	params.Stereobuffer  = stereo_buffer;
 	params.Vsync         = vsync;
 	params.EventReceiver = receiver;
 	params.HighPrecisionFPU = g_settings->getBool("high_precision_fpu");
+	params.ZBufferBits   = 24;
 #ifdef __ANDROID__
 	params.PrivateData = porting::app_global;
 	params.OGLES2ShaderPath = std::string(porting::path_user + DIR_DELIM +

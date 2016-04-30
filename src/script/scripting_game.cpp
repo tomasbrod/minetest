@@ -39,6 +39,7 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 #include "lua_api/l_util.h"
 #include "lua_api/l_vmanip.h"
 #include "lua_api/l_settings.h"
+#include "lua_api/l_http.h"
 #include "lua_api/l_dll.h"
 
 extern "C" {
@@ -90,6 +91,7 @@ void GameScripting::InitializeModApi(lua_State *L, int top)
 	ModApiRollback::Initialize(L, top);
 	ModApiServer::Initialize(L, top);
 	ModApiUtil::Initialize(L, top);
+	ModApiHttp::Initialize(L, top);
 	ModApiDll::Initialize(L, top);
 
 	// Register reference classes (userdata)
@@ -100,6 +102,7 @@ void GameScripting::InitializeModApi(lua_State *L, int top)
 	LuaPerlinNoiseMap::Register(L);
 	LuaPseudoRandom::Register(L);
 	LuaPcgRandom::Register(L);
+	LuaSecureRandom::Register(L);
 	LuaVoxelManip::Register(L);
 	NodeMetaRef::Register(L);
 	NodeTimerRef::Register(L);

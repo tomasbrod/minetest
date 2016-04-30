@@ -287,6 +287,7 @@ public:
 		const std::string &playername);
 
 	void deleteParticleSpawner(const std::string &playername, u32 id);
+	void deleteParticleSpawnerAll(u32 id);
 
 	// Creates or resets inventory
 	Inventory* createDetachedInventory(const std::string &name);
@@ -476,9 +477,12 @@ private:
 	void DeleteClient(u16 peer_id, ClientDeletionReason reason);
 	void UpdateCrafting(Player *player);
 
+	void handleChatInterfaceEvent(ChatEvent *evt);
+
 	// This returns the answer to the sender of wmessage, or "" if there is none
 	std::wstring handleChat(const std::string &name, const std::wstring &wname,
 		const std::wstring &wmessage,
+		bool check_shout_priv = false,
 		u16 peer_id_to_avoid_sending = PEER_ID_INEXISTENT);
 	void handleAdminChat(const ChatEventChat *evt);
 
@@ -658,11 +662,6 @@ private:
 	*/
 	// key = name
 	std::map<std::string, Inventory*> m_detached_inventories;
-
-	/*
-		Particles
-	*/
-	std::vector<u32> m_particlespawner_ids;
 
 	DISABLE_CLASS_COPY(Server);
 };
