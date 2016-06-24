@@ -9,14 +9,14 @@
 int ModApiDll::l_sampletext(lua_State *L)
 {
 	NO_MAP_LOCK_REQUIRED;
-	infostream<<"sampletext"<<std::endl;
+	actionstream<<"sampletext"<<std::endl;
 	return 0; /* number of results */
 }
 int ModApiDll::l_loadobject(lua_State *L)
 {
 	NO_MAP_LOCK_REQUIRED;
 	const char * libname = luaL_checkstring(L, 1);
-	infostream<<"LoadObject: "<<libname<<std::endl;
+	actionstream<<"LoadObject: "<<libname<<std::endl;
 	return 0; /* number of results */
 }
 
