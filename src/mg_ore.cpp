@@ -462,14 +462,31 @@ void OrePipe::placePipe(MMVManip *vm, v3s16 nmin, v3s16 nmax, PcgRandom pr, v3f 
 {
   const float stepadj=1.7;
 	MapNode n_ore(c_ore, 0, ore_param2);
+  v3f sa_p=pA;
+  v3f p;
+  //*estimate a step size*
   float step=(stepadj*pipe_radius)/(pA.getDistanceFrom(pB)+pB.getDistanceFrom(pC));
-  for(float t=0; t<=1; t=t+step)
+  for(float t=0; t<=1; t=t+step) //drawing loop
   {
-    //*compute curve point*
-    //fancy operator overloading :-O
-    v3f p = pA * (1-t)*(1-t);
-    p    += pC * 2*t*(1-t);
-    p    += pB * t*t;
+    char sa_c=0;
+    while(sa_c++<6) //step adjust loop
+    {
+      //*compute curve point*
+      p  = pA * ((1-t)*(1-t));
+      p += pC * (2*t*(1-t));
+      p += pB * (t*t);
+
+      //*adjust step*
+      if(t==0) break;
+      float sa_e = p.getDistanceFrom(sa_p)-pipe_radius;
+      if (sa_e>1)
+        { step=step*0.50; t=t-step; }
+      else if (sa_e<0)
+        { t=t+(step/2); step=step+(step/2); }
+      else break;
+      printf("step_adjust %d %f %f \n",sa_c,sa_e,step);
+    }
+    sa_p=p;
 
     //*convert float[3] to area index*
     u32 di = vm->m_area.index(p.X, p.Y, p.Z); //maybe round...
@@ -502,19 +519,19 @@ void OrePipe::generate(MMVManip *vm, int mapseed, u32 blockseed,
 
 	float gencnt_raw = (float)volume / (float)clust_scarcity;
   u32 gencnt = ((float)(gencnt_raw) + (float)((((float)pr.next())/((float)pr.RANDOM_RANGE))));
-
+  printf("gencnt: %d..%d %d\n", nmin.X,nmax.X, gencnt);
 	for (u32 i = 0; i != gencnt; i++) {
     v3f A, B, C;
     //$note todo calculate A,B based on dit_theta,pipe_length,etc
     A.X = pr.range(nmin.X, nmax.X + 1); //not sure about that +1
-    A.Y = pr.range(nmin.X, nmax.X + 1);
-    A.Z = pr.range(nmin.X, nmax.X + 1);
+    A.Y = pr.range(nmin.Y, nmax.Y + 1);
+    A.Z = pr.range(nmin.Z, nmax.Z + 1);
     B.X = pr.range(nmin.X, nmax.X + 1);
-    B.Y = pr.range(nmin.X, nmax.X + 1);
-    B.Z = pr.range(nmin.X, nmax.X + 1);
+    B.Y = pr.range(nmin.Y, nmax.Y + 1);
+    B.Z = pr.range(nmin.Z, nmax.Z + 1);
     C.X = pr.range(nmin.X, nmax.X + 1);
-    C.Y = pr.range(nmin.X, nmax.X + 1);
-    C.Z = pr.range(nmin.X, nmax.X + 1);
+    C.Y = pr.range(nmin.Y, nmax.Y + 1);
+    C.Z = pr.range(nmin.Z, nmax.Z + 1);
 
 		if (biomemap && !biomes.empty()) {
 			u32 index = sizex * (A.Z - nmin.Z) + (A.X - nmin.X);
@@ -522,7 +539,7 @@ void OrePipe::generate(MMVManip *vm, int mapseed, u32 blockseed,
 			if (it == biomes.end())
 				continue;
 		}
-
+    printf("place %f.0,%f.0,%f.0\n",A.X,A.Y,A.Z);
     placePipe(vm, nmin, nmax, pr, A, B, C);
 
 	}
