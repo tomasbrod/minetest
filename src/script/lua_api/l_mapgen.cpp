@@ -73,6 +73,7 @@ struct EnumString ModApiMapgen::es_OreType[] =
 	{ORE_PUFF,    "puff"},
 	{ORE_BLOB,    "blob"},
 	{ORE_VEIN,    "vein"},
+	{ORE_PIPE,    "pipe"},
 	{0, NULL},
 };
 
@@ -1133,6 +1134,17 @@ int ModApiMapgen::l_register_ore(lua_State *L)
 				"random_factor", 1.f);
 
 			break;
+    }
+		case ORE_PIPE: {
+      OrePipe *orepipe = (OrePipe *)ore;
+      orepipe->pipe_radius=getintfield_default(L, index,
+				"pipe_radius", 1);
+      //s16 pipe_length;   // min distance A-B
+      //s16 pipe_length_rnd; // add 0..this to length
+      //float dir_theta;   // min inclination in radians
+      //float dir_theta_rnd; // add 0..this to theta
+      //float curving; // 0 is strait line
+      break;
 		}
 		default:
 			break;

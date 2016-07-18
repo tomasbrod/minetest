@@ -44,6 +44,7 @@ enum OreType {
 	ORE_PUFF,
 	ORE_BLOB,
 	ORE_VEIN,
+  ORE_PIPE,
 };
 
 extern FlagDesc flagdesc_ore[];
@@ -134,6 +135,24 @@ public:
 		v3s16 nmin, v3s16 nmax, u8 *biomemap);
 };
 
+class OrePipe : public Ore {
+public:
+	static const bool NEEDS_NOISE = false;
+
+	s16 pipe_radius;   // radius of pipe in nodes
+  s16 pipe_length;   // min distance A-B
+  s16 pipe_length_rnd; // add 0..this to length
+  float dir_theta;   // min inclination in radians
+  float dir_theta_rnd; // add 0..this to theta
+  float curving; // 0 is strait line
+
+  //clusters todo
+
+  void placePipe(MMVManip *vm, v3s16 nmin, v3s16 nmax, PcgRandom pr, v3f pA, v3f pB, v3f pC);
+	virtual void generate(MMVManip *vm, int mapseed, u32 blockseed,
+		v3s16 nmin, v3s16 nmax, u8 *biomemap);
+};
+
 class OreManager : public ObjDefManager {
 public:
 	OreManager(IGameDef *gamedef);
@@ -157,6 +176,8 @@ public:
 			return new OreBlob;
 		case ORE_VEIN:
 			return new OreVein;
+		case ORE_PIPE:
+			return new OrePipe;
 		default:
 			return NULL;
 		}

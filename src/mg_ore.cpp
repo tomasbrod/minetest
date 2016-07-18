@@ -15,6 +15,13 @@ GNU Lesser General Public License for more details.
 You should have received a copy of the GNU Lesser General Public License along
 with this program; if not, write to the Free Software Foundation, Inc.,
 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+
+Instead (inaddition) of this stupid license text that is already in
+license.txt or similar here should be quick description of what this
+file contains.
+
+Ore spawning algorithms and OreManager.
+
 */
 
 #include "mg_ore.h"
@@ -444,3 +451,80 @@ void OreVein::generate(MMVManip *vm, int mapseed, u32 blockseed,
 		vm->m_data[i] = n_ore;
 	}
 }
+
+///////////////////////////////////////////////////////////////////////////////
+
+void OrePipe::placePipe(MMVManip *vm, v3s16 nmin, v3s16 nmax, PcgRandom pr, v3f pA, v3f pB, v3f pC)
+/*
+	Spawn a single "pipe" between points A and B with control point C
+  $hint is nmin and nmax value in in vm object?
+*/
+{
+  const float stepadj=1.7;
+	MapNode n_ore(c_ore, 0, ore_param2);
+  float step=(stepadj*pipe_radius)/(pA.getDistanceFrom(pB)+pB.getDistanceFrom(pC));
+  for(float t=0; t<=1; t=t+step)
+  {
+    //*compute curve point*
+    //fancy operator overloading :-O
+    v3f p = pA * (1-t)*(1-t);
+    p    += pC * 2*t*(1-t);
+    p    += pB * t*t;
+
+    //*convert float[3] to area index*
+    u32 di = vm->m_area.index(p.X, p.Y, p.Z); //maybe round...
+
+    //*check can place*
+    if (!vm->m_area.contains(di))
+      continue; //stupid style
+    if (!CONTAINS(c_wherein, vm->m_data[di].getContent()))
+      continue;
+
+    //*place the actual pipe segment*
+    //$note todo use brush
+    vm->m_data[di] = n_ore;
+  }
+}
+
+void OrePipe::generate(MMVManip *vm, int mapseed, u32 blockseed,
+	v3s16 nmin, v3s16 nmax, u8 *biomemap)
+/*
+  Generate all "pipe" ores in current mg-block
+  not using noise
+*/
+{
+	PcgRandom pr(blockseed);
+
+	u32 sizex  = (nmax.X - nmin.X + 1);
+	u32 volume = (nmax.X - nmin.X + 1) *
+				 (nmax.Y - nmin.Y + 1) *
+				 (nmax.Z - nmin.Z + 1);
+
+	float gencnt_raw = (float)volume / (float)clust_scarcity;
+  u32 gencnt = ((float)(gencnt_raw) + (float)((((float)pr.next())/((float)pr.RANDOM_RANGE))));
+
+	for (u32 i = 0; i != gencnt; i++) {
+    v3f A, B, C;
+    //$note todo calculate A,B based on dit_theta,pipe_length,etc
+    A.X = pr.range(nmin.X, nmax.X + 1); //not sure about that +1
+    A.Y = pr.range(nmin.X, nmax.X + 1);
+    A.Z = pr.range(nmin.X, nmax.X + 1);
+    B.X = pr.range(nmin.X, nmax.X + 1);
+    B.Y = pr.range(nmin.X, nmax.X + 1);
+    B.Z = pr.range(nmin.X, nmax.X + 1);
+    C.X = pr.range(nmin.X, nmax.X + 1);
+    C.Y = pr.range(nmin.X, nmax.X + 1);
+    C.Z = pr.range(nmin.X, nmax.X + 1);
+
+		if (biomemap && !biomes.empty()) {
+			u32 index = sizex * (A.Z - nmin.Z) + (A.X - nmin.X);
+			std::set<u8>::iterator it = biomes.find(biomemap[index]);
+			if (it == biomes.end())
+				continue;
+		}
+
+    placePipe(vm, nmin, nmax, pr, A, B, C);
+
+	}
+}
+
