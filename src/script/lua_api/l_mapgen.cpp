@@ -1139,10 +1139,14 @@ int ModApiMapgen::l_register_ore(lua_State *L)
       OrePipe *orepipe = (OrePipe *)ore;
       orepipe->pipe_radius=getintfield_default(L, index,
 				"pipe_radius", 1);
-      //s16 pipe_length;   // min distance A-B
-      //s16 pipe_length_rnd; // add 0..this to length
-      //float dir_theta;   // min inclination in radians
-      //float dir_theta_rnd; // add 0..this to theta
+      orepipe->dir_theta=getfloatfield_default(L, index,
+        "dir_theta", 0.785f);
+      orepipe->dir_theta_rnd=getfloatfield_default(L, index,
+        "dir_theta_rnd", 0.0f);
+			orepipe->pipe_length = getfloatfield_default(L, index,
+				"pipe_length", 9.0f);
+			orepipe->pipe_length_rnd = getfloatfield_default(L, index,
+				"pipe_length_rnd", 2.0f);
       //float curving; // 0 is strait line
       break;
 		}

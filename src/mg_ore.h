@@ -140,8 +140,8 @@ public:
 	static const bool NEEDS_NOISE = false;
 
 	s16 pipe_radius;   // radius of pipe in nodes
-  s16 pipe_length;   // min distance A-B
-  s16 pipe_length_rnd; // add 0..this to length
+  float pipe_length;   // min distance A-B
+  float pipe_length_rnd; // add 0..this to length
   float dir_theta;   // min inclination in radians
   float dir_theta_rnd; // add 0..this to theta
   float curving; // 0 is strait line
