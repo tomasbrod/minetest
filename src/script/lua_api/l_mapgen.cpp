@@ -1147,7 +1147,8 @@ int ModApiMapgen::l_register_ore(lua_State *L)
 				"pipe_length", 9.0f);
 			orepipe->pipe_length_rnd = getfloatfield_default(L, index,
 				"pipe_length_rnd", 2.0f);
-      //float curving; // 0 is strait line
+			orepipe->curving = getfloatfield_default(L, index,
+				"curving", 2.0f);
       break;
 		}
 		default:
