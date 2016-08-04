@@ -74,6 +74,7 @@ struct EnumString ModApiMapgen::es_OreType[] =
 	{ORE_BLOB,    "blob"},
 	{ORE_VEIN,    "vein"},
 	{ORE_PIPE,    "pipe"},
+	{ORE_SUB_SCATTER,    "subscatter"},
 	{0, NULL},
 };
 
@@ -1151,6 +1152,17 @@ int ModApiMapgen::l_register_ore(lua_State *L)
 				"curving", 2.0f);
       break;
 		}
+		case ORE_SUB_SCATTER: {
+			OreScatter *oresub = (OreScatter *)ore;
+      ObjDefHandle ph = getintfield_default(L, index, "parent", OBJDEF_INVALID_HANDLE);
+      printf("parent handle %d\n",ph);
+      assert(ph!=OBJDEF_INVALID_HANDLE);
+      Ore *parent = (Ore*)oremgr->get(ph);
+      assert(parent);
+			oresub->parent = parent;
+      parent->sub_ores.push_back(oresub);
+			break;
+    }
 		default:
 			break;
 	}

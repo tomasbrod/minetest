@@ -45,10 +45,12 @@ enum OreType {
 	ORE_BLOB,
 	ORE_VEIN,
   ORE_PIPE,
+  ORE_SUB_SCATTER,
 };
 
 extern FlagDesc flagdesc_ore[];
 
+class OreSub;
 class Ore : public ObjDef, public NodeResolver {
 public:
 	static const bool NEEDS_NOISE = false;
@@ -66,6 +68,7 @@ public:
 	NoiseParams np;     // noise for distribution of clusters (NULL for uniform scattering)
 	Noise *noise;
 	std::set<u8> biomes;
+	std::vector<OreSub*> sub_ores;
 
 	Ore();
 	virtual ~Ore();
@@ -77,12 +80,25 @@ public:
 		v3s16 nmin, v3s16 nmax, u8 *biomemap) = 0;
 };
 
-class OreScatter : public Ore {
+class OreSub : public Ore {
+public:
+	OreSub();
+	Ore *parent;
+	virtual void resolveNodeNames();
+  virtual void place(MMVManip *vm, int mapseed, u8 *biomemap,
+    v3s16 nmin, v3s16 nmax, PcgRandom &pr,
+    v3s16 pA) = 0;
+};
+
+class OreScatter : public OreSub {
 public:
 	static const bool NEEDS_NOISE = false;
 
 	virtual void generate(MMVManip *vm, int mapseed, u32 blockseed,
 		v3s16 nmin, v3s16 nmax, u8 *biomemap);
+  virtual void place(MMVManip *vm, int mapseed, u8 *biomemap,
+    v3s16 nmin, v3s16 nmax, PcgRandom &pr,
+    v3s16 pA);
 };
 
 class OreSheet : public Ore {
@@ -148,7 +164,9 @@ public:
 
   //clusters todo
 
-  void placePipe(MMVManip *vm, v3s16 nmin, v3s16 nmax, PcgRandom pr, v3f pA, v3f pB, v3f pC);
+  void placePipe(MMVManip *vm, int mapseed, u8 *biomemap,
+    v3s16 nmin, v3s16 nmax, PcgRandom &pr,
+    v3f pA, v3f pB, v3f pC);
 	virtual void generate(MMVManip *vm, int mapseed, u32 blockseed,
 		v3s16 nmin, v3s16 nmax, u8 *biomemap);
 };
@@ -178,6 +196,8 @@ public:
 			return new OreVein;
 		case ORE_PIPE:
 			return new OrePipe;
+		case ORE_SUB_SCATTER:
+			return new OreScatter;
 		default:
 			return NULL;
 		}

@@ -30,6 +30,7 @@ Ore spawning algorithms and OreManager.
 #include "util/numeric.h"
 #include "map.h"
 #include "log.h"
+#include "util/timetaker.h"
 
 FlagDesc flagdesc_ore[] = {
 	{"absheight",                 OREFLAG_ABSHEIGHT},
@@ -97,6 +98,22 @@ void Ore::resolveNodeNames()
 	getIdsFromNrBacklog(&c_wherein);
 }
 
+OreSub::OreSub()
+{
+	parent=NULL;
+}
+void OreSub::resolveNodeNames()
+{
+	if(parent)
+	{
+		infostream << "OreSub:resolveNodeNames " << name << '\n';
+		getIdFromNrBacklog(&c_ore, "", CONTENT_AIR);
+		c_wherein=parent->c_wherein;
+		c_wherein.push_back(parent->c_ore);
+		biomes=parent->biomes;
+	}
+	else Ore::resolveNodeNames();
+}
 
 size_t Ore::placeOre(Mapgen *mg, u32 blockseed, v3s16 nmin, v3s16 nmax)
 {
@@ -130,18 +147,51 @@ size_t Ore::placeOre(Mapgen *mg, u32 blockseed, v3s16 nmin, v3s16 nmax)
 ///////////////////////////////////////////////////////////////////////////////
 
 
+void OreScatter::place(MMVManip *vm, int mapseed, u8 *biomemap, v3s16 nmin, v3s16 nmax, PcgRandom &pr, v3s16 pA)
+{
+	MapNode n_ore(c_ore, 0, ore_param2);
+	u32 sizex  = (nmax.X - nmin.X + 1);
+	u32 csize     = clust_size;
+	u32 cvolume    = csize * csize * csize;
+
+	if ((flags & OREFLAG_USE_NOISE) &&
+		(NoisePerlin3D(&np, pA.X, pA.Y, pA.Z, mapseed) < nthresh))
+		return;
+
+	if (biomemap && !biomes.empty()) {
+		u32 index = sizex * (pA.Z - nmin.Z) + (pA.X - nmin.X);
+		std::set<u8>::iterator it = biomes.find(biomemap[index]);
+		if (it == biomes.end())
+			return;
+	}
+
+	for (u32 z1 = 0; z1 != csize; z1++)
+	for (u32 y1 = 0; y1 != csize; y1++)
+	for (u32 x1 = 0; x1 != csize; x1++) {
+		if (pr.range(1, cvolume) > clust_num_ores)
+			continue;
+
+		u32 i = vm->m_area.index(pA.X + x1, pA.Y + y1, pA.Z + z1);
+		if (!vm->m_area.contains(i))
+				continue;
+		if (!CONTAINS(c_wherein, vm->m_data[i].getContent()))
+			continue;
+
+		vm->m_data[i] = n_ore;
+	}
+}
+
 void OreScatter::generate(MMVManip *vm, int mapseed, u32 blockseed,
 	v3s16 nmin, v3s16 nmax, u8 *biomemap)
 {
+	if(parent) return;
 	PcgRandom pr(blockseed);
 	MapNode n_ore(c_ore, 0, ore_param2);
 
-	u32 sizex  = (nmax.X - nmin.X + 1);
 	u32 volume = (nmax.X - nmin.X + 1) *
 				 (nmax.Y - nmin.Y + 1) *
 				 (nmax.Z - nmin.Z + 1);
 	u32 csize     = clust_size;
-	u32 cvolume    = csize * csize * csize;
 	u32 nclusters = volume / clust_scarcity;
 
 	for (u32 i = 0; i != nclusters; i++) {
@@ -153,25 +203,7 @@ void OreScatter::generate(MMVManip *vm, int mapseed, u32 blockseed,
 			(NoisePerlin3D(&np, x0, y0, z0, mapseed) < nthresh))
 			continue;
 
-		if (biomemap && !biomes.empty()) {
-			u32 index = sizex * (z0 - nmin.Z) + (x0 - nmin.X);
-			std::set<u8>::iterator it = biomes.find(biomemap[index]);
-			if (it == biomes.end())
-				continue;
-		}
-
-		for (u32 z1 = 0; z1 != csize; z1++)
-		for (u32 y1 = 0; y1 != csize; y1++)
-		for (u32 x1 = 0; x1 != csize; x1++) {
-			if (pr.range(1, cvolume) > clust_num_ores)
-				continue;
-
-			u32 i = vm->m_area.index(x0 + x1, y0 + y1, z0 + z1);
-			if (!CONTAINS(c_wherein, vm->m_data[i].getContent()))
-				continue;
-
-			vm->m_data[i] = n_ore;
-		}
+		place(vm,mapseed,biomemap,nmin,nmax,pr,v3s16(x0,y0,z0));
 	}
 }
 
@@ -454,12 +486,13 @@ void OreVein::generate(MMVManip *vm, int mapseed, u32 blockseed,
 
 ///////////////////////////////////////////////////////////////////////////////
 
-void OrePipe::placePipe(MMVManip *vm, v3s16 nmin, v3s16 nmax, PcgRandom pr, v3f pA, v3f pB, v3f pC)
+void OrePipe::placePipe(MMVManip *vm, int mapseed, u8 *biomemap, v3s16 nmin, v3s16 nmax, PcgRandom &pr, v3f pA, v3f pB, v3f pC)
 /*
 	Spawn a single "pipe" between points A and B with control point C
   $hint is nmin and nmax value in in vm object?
 */
 {
+	TimeTaker tt ("OrePipe place pipe with all sub-dists",NULL,PRECISION_MICRO);
 	MapNode n_ore(c_ore, 0, ore_param2);
   v3f sa_p=pA;
   v3f p;
@@ -498,7 +531,7 @@ void OrePipe::placePipe(MMVManip *vm, v3s16 nmin, v3s16 nmax, PcgRandom pr, v3f 
 
 			//*check can place*
 			if (!vm->m_area.contains(di))
-				continue; //stupid style
+				continue;
 			if(((bx*bx)+(by*by)+(bz*bz)-(pipe_radius*pipe_radius))>0)
 				continue;
 			if (!CONTAINS(c_wherein, vm->m_data[di].getContent()))
@@ -509,6 +542,11 @@ void OrePipe::placePipe(MMVManip *vm, v3s16 nmin, v3s16 nmax, PcgRandom pr, v3f 
 			vm->m_data[di] = n_ore;
 		}
   }
+  for (auto it = sub_ores.begin() ; it != sub_ores.end(); ++it)
+  {
+		(*it)->place(vm,mapseed,biomemap,nmin,nmax,pr,v3s16(pA.X,pA.Y,pA.Z));
+	}
+  tt.stop(false);
 }
 
 void OrePipe::generate(MMVManip *vm, int mapseed, u32 blockseed,
@@ -519,6 +557,7 @@ void OrePipe::generate(MMVManip *vm, int mapseed, u32 blockseed,
 */
 {
 	PcgRandom pr(blockseed);
+	TimeTaker tt ("OrePipe generate single",NULL,PRECISION_MICRO);
 
 	u32 sizex  = (nmax.X - nmin.X + 1);
 	u32 volume = (nmax.X - nmin.X + 1) *
@@ -567,8 +606,8 @@ void OrePipe::generate(MMVManip *vm, int mapseed, u32 blockseed,
 		}
 
     printf("place (%f.0,%f.0,%f.0),(%f.0,%f.0,%f.0),(%f.0,%f.0,%f.0)\n",A.X,A.Y,A.Z,C.X,C.Y,C.Z,B.X,B.Y,B.Z);
-    placePipe(vm, nmin, nmax, pr, A, B, C);
-
+    placePipe(vm, mapseed, biomemap, nmin, nmax, pr, A, B, C);
 	}
+	tt.stop(false);
 }
 
