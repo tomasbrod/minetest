@@ -1172,6 +1172,7 @@ int ModApiMapgen::l_register_ore(lua_State *L)
 		delete ore;
 		return 0;
 	}
+  printf("handle %d\n",handle);
 
 	ore->m_nodenames.push_back(getstringfield_default(L, index, "ore", ""));
 

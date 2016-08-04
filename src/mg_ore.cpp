@@ -542,8 +542,10 @@ void OrePipe::placePipe(MMVManip *vm, int mapseed, u8 *biomemap, v3s16 nmin, v3s
 			vm->m_data[di] = n_ore;
 		}
   }
+  printf("no of sub-dists in this pipe dist: %d\n",sub_ores.size());
   for (auto it = sub_ores.begin() ; it != sub_ores.end(); ++it)
   {
+		printf("gen sub ore\n");
 		(*it)->place(vm,mapseed,biomemap,nmin,nmax,pr,v3s16(pA.X,pA.Y,pA.Z));
 	}
   tt.stop(false);
