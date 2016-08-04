@@ -460,12 +460,11 @@ void OrePipe::placePipe(MMVManip *vm, v3s16 nmin, v3s16 nmax, PcgRandom pr, v3f 
   $hint is nmin and nmax value in in vm object?
 */
 {
-  const float stepadj=1.7;
 	MapNode n_ore(c_ore, 0, ore_param2);
   v3f sa_p=pA;
   v3f p;
   //*estimate a step size*
-  float step=(stepadj*pipe_radius)/(pA.getDistanceFrom(pB)+pB.getDistanceFrom(pC));
+  float step=1.7/(pA.getDistanceFrom(pB)+pB.getDistanceFrom(pC));
   for(float t=0; t<=1; t=t+step) //drawing loop
   {
     char sa_c=0;
@@ -479,9 +478,9 @@ void OrePipe::placePipe(MMVManip *vm, v3s16 nmin, v3s16 nmax, PcgRandom pr, v3f 
       //*adjust step*
       if(t==0) break;
       float sa_e = p.getDistanceFrom(sa_p)-pipe_radius;
-      if (sa_e>=1)
+      if (sa_e>=1.7)
         { step=step*0.50; t=t-step; }
-      else if (sa_e<0)
+      else if (sa_e<0.0)
         { t=t+(step/2); step=step+(step/2); }
       else break;
       printf("step_adjust %d %f %f \n",sa_c,sa_e,step);
@@ -489,18 +488,26 @@ void OrePipe::placePipe(MMVManip *vm, v3s16 nmin, v3s16 nmax, PcgRandom pr, v3f 
     p.X=round(p.X);p.Y=round(p.Y);p.Z=round(p.Z);
     sa_p=p;
 
-    //*convert float[3] to area index*
-    u32 di = vm->m_area.index(p.X, p.Y, p.Z); //maybe round...
+    for(int bz=-pipe_radius; bz<=pipe_radius; bz++)
+    for(int by=-pipe_radius; by<=pipe_radius; by++)
+    for(int bx=-pipe_radius; bx<=pipe_radius; bx++)
+    {
 
-    //*check can place*
-    if (!vm->m_area.contains(di))
-      continue; //stupid style
-    if (!CONTAINS(c_wherein, vm->m_data[di].getContent()))
-      continue;
+			//*convert float[3] to area index*
+			u32 di = vm->m_area.index(p.X+bx, p.Y+by, p.Z+bz);
 
-    //*place the actual pipe segment*
-    //$note todo use brush
-    vm->m_data[di] = n_ore;
+			//*check can place*
+			if (!vm->m_area.contains(di))
+				continue; //stupid style
+			if(((bx*bx)+(by*by)+(bz*bz)-(pipe_radius*pipe_radius))>0)
+				continue;
+			if (!CONTAINS(c_wherein, vm->m_data[di].getContent()))
+				continue;
+
+			//*place the actual pipe segment*
+			//$note todo use brush
+			vm->m_data[di] = n_ore;
+		}
   }
 }
 
@@ -521,7 +528,7 @@ void OrePipe::generate(MMVManip *vm, int mapseed, u32 blockseed,
 	//*calc count of pipes in this block*
 	float gencnt_raw = (float)volume / (float)clust_scarcity;
   u32 gencnt = ((float)(gencnt_raw) + (float)((((float)pr.next())/((float)pr.RANDOM_RANGE))));
-  printf("gencnt: %d..%d %d\n", nmin.X,nmax.X, gencnt);
+  //printf("gencnt: %d..%d %d\n", nmin.X,nmax.X, gencnt);
 	for (u32 i = 0; i != gencnt; i++) {
     v3f A, B, C;
 
@@ -532,7 +539,7 @@ void OrePipe::generate(MMVManip *vm, int mapseed, u32 blockseed,
     float length = pipe_length + ((float)pr.next()*pipe_length_rnd/pr.RANDOM_RANGE);
     v3f dirv ( round(dir_nv.X*length), round(dir_nv.Y*length), round(dir_nv.Z*length) );
     
-    printf("dir theta=%f phi=%f length=%f nv=(%f,%f,%f) v=(%f.1,%f.1,%f.1) d=%f\n",dir_theta_ar,dir_phi_ar,length,dir_nv.X,dir_nv.Y,dir_nv.Z,dirv.X,dirv.Y,dirv.Z,dirv.getLength());
+    //printf("dir theta=%f phi=%f length=%f nv=(%f,%f,%f) v=(%f.1,%f.1,%f.1) d=%f\n",dir_theta_ar,dir_phi_ar,length,dir_nv.X,dir_nv.Y,dir_nv.Z,dirv.X,dirv.Y,dirv.Z,dirv.getLength());
 
 		//*select start of pipe*
 		A.X = pr.range(nmin.X, nmax.X +1 -dirv.X);
