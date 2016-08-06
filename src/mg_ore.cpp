@@ -143,6 +143,16 @@ size_t Ore::placeOre(Mapgen *mg, u32 blockseed, v3s16 nmin, v3s16 nmax)
 	return 1;
 }
 
+static u32 GetOreGenCount(PcgRandom &pr,u32 volume,u32 scarcity)
+/*
+	Calculate ore clusters count in given volume
+	Random contribution is <0;1)
+*/
+{
+	float gencnt_raw = (float)volume / (float)scarcity;
+  u32 gencnt = ((float)(gencnt_raw) + (float)((((float)pr.next())/((float)pr.RANDOM_RANGE))));
+  return gencnt;
+}
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -496,6 +506,7 @@ void OrePipe::placePipe(MMVManip *vm, int mapseed, u8 *biomemap, v3s16 nmin, v3s
 	MapNode n_ore(c_ore, 0, ore_param2);
   v3f sa_p=pA;
   v3f p;
+ 	u32 volume = 0;
   //*estimate a step size*
   float step=1.7/(pA.getDistanceFrom(pB)+pB.getDistanceFrom(pC));
   for(float t=0; t<=1; t=t+step) //drawing loop
@@ -518,7 +529,7 @@ void OrePipe::placePipe(MMVManip *vm, int mapseed, u8 *biomemap, v3s16 nmin, v3s
       else break;
       printf("step_adjust %d %f %f \n",sa_c,sa_e,step);
     }
-    p.X=round(p.X);p.Y=round(p.Y);p.Z=round(p.Z);
+    //p.X=round(p.X);p.Y=round(p.Y);p.Z=round(p.Z);
     sa_p=p;
 
     for(int bz=-pipe_radius; bz<=pipe_radius; bz++)
@@ -538,15 +549,25 @@ void OrePipe::placePipe(MMVManip *vm, int mapseed, u8 *biomemap, v3s16 nmin, v3s
 				continue;
 
 			//*place the actual pipe segment*
-			//$note todo use brush
 			vm->m_data[di] = n_ore;
+			volume++;
 		}
   }
-  printf("no of sub-dists in this pipe dist: %d\n",sub_ores.size());
+  printf("no of sub-dists in this %s pipe dist %u volume: %lu\n",name.c_str(),volume,sub_ores.size());
   for (auto it = sub_ores.begin() ; it != sub_ores.end(); ++it)
   {
-		printf("gen sub ore\n");
-		(*it)->place(vm,mapseed,biomemap,nmin,nmax,pr,v3s16(pA.X,pA.Y,pA.Z));
+		OreSub &sub = **it;
+		u32 gencnt = GetOreGenCount(pr,volume,sub.clust_scarcity);
+		printf("this pipe dist: %u of %s\n",gencnt,sub.name.c_str());
+		for(;gencnt>0;gencnt--)
+		{
+			float t = ((float)pr.next()/(pr.RANDOM_RANGE));
+			p  = pA * ((1-t)*(1-t));
+      p += pC * (2*t*(1-t));
+      p += pB * (t*t);
+			sub.place(vm,mapseed,biomemap,nmin,nmax,pr,
+				v3s16(p.X+pr.range(-pipe_radius,+pipe_radius), p.Y+pr.range(-pipe_radius,+pipe_radius), p.Z+pr.range(-pipe_radius,+pipe_radius)));
+		}
 	}
   tt.stop(false);
 }
@@ -559,7 +580,7 @@ void OrePipe::generate(MMVManip *vm, int mapseed, u32 blockseed,
 */
 {
 	PcgRandom pr(blockseed);
-	TimeTaker tt ("OrePipe generate single",NULL,PRECISION_MICRO);
+	TimeTaker tt ("OrePipe generate",NULL,PRECISION_MICRO);
 
 	u32 sizex  = (nmax.X - nmin.X + 1);
 	u32 volume = (nmax.X - nmin.X + 1) *
@@ -567,8 +588,7 @@ void OrePipe::generate(MMVManip *vm, int mapseed, u32 blockseed,
 				 (nmax.Z - nmin.Z + 1);
 
 	//*calc count of pipes in this block*
-	float gencnt_raw = (float)volume / (float)clust_scarcity;
-  u32 gencnt = ((float)(gencnt_raw) + (float)((((float)pr.next())/((float)pr.RANDOM_RANGE))));
+  u32 gencnt = GetOreGenCount(pr,volume,clust_scarcity);
   //printf("gencnt: %d..%d %d\n", nmin.X,nmax.X, gencnt);
 	for (u32 i = 0; i != gencnt; i++) {
     v3f A, B, C;
