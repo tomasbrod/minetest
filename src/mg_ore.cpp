@@ -202,7 +202,7 @@ void OreScatter::generate(MMVManip *vm, int mapseed, u32 blockseed,
 				 (nmax.Y - nmin.Y + 1) *
 				 (nmax.Z - nmin.Z + 1);
 	u32 csize     = clust_size;
-	u32 nclusters = volume / clust_scarcity;
+	u32 nclusters = GetOreGenCount(pr,volume,clust_scarcity);
 
 	for (u32 i = 0; i != nclusters; i++) {
 		int x0 = pr.range(nmin.X, nmax.X - csize + 1);
