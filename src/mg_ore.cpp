@@ -423,6 +423,19 @@ void OreBlob::generate(MMVManip *vm, int mapseed, u32 blockseed,
 
 			vm->m_data[i] = n_ore;
 		}
+		for (auto it = sub_ores.begin() ; it != sub_ores.end(); ++it)
+		{
+			OreSub &sub = **it;
+			u32 gencnt = GetOreGenCount(pr,csize*csize*csize,sub.clust_scarcity);
+			for(;gencnt>0;gencnt--)
+			{
+				v3s16 p;
+				p.X=pr.range(csize)+x0;
+				p.Y=pr.range(csize)+y0;
+				p.Z=pr.range(csize)+z0;
+				sub.place(vm,mapseed,biomemap,nmin,nmax,pr,p);
+			}
+		}
 	}
 }
 
@@ -527,7 +540,7 @@ void OrePipe::placePipe(MMVManip *vm, int mapseed, u8 *biomemap, v3s16 nmin, v3s
       else if (sa_e<0.0)
         { t=t+(step/2); step=step+(step/2); }
       else break;
-      printf("step_adjust %d %f %f \n",sa_c,sa_e,step);
+      //printf("step_adjust %d %f %f \n",sa_c,sa_e,step);
     }
     //p.X=round(p.X);p.Y=round(p.Y);p.Z=round(p.Z);
     sa_p=p;
