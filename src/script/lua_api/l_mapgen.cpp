@@ -1144,9 +1144,9 @@ int ModApiMapgen::l_register_ore(lua_State *L)
         "dir_theta", 0.785f);
       orepipe->dir_theta_rnd=getfloatfield_default(L, index,
         "dir_theta_rnd", 0.0f);
-			orepipe->pipe_length = getfloatfield_default(L, index,
+			orepipe->pipe_length = getintfield_default(L, index,
 				"pipe_length", 9.0f);
-			orepipe->pipe_length_rnd = getfloatfield_default(L, index,
+			orepipe->pipe_length_rnd = getintfield_default(L, index,
 				"pipe_length_rnd", 2.0f);
 			orepipe->curving = getfloatfield_default(L, index,
 				"curving", 2.0f);
