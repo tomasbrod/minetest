@@ -106,7 +106,6 @@ void OreSub::resolveNodeNames()
 {
 	if(parent)
 	{
-		infostream << "OreSub:resolveNodeNames " << name << '\n';
 		getIdFromNrBacklog(&c_ore, "", CONTENT_AIR);
 		c_wherein=parent->c_wherein;
 		c_wherein.push_back(parent->c_ore);
@@ -507,7 +506,7 @@ void OreVein::generate(struct OreEnv env)
 
 ///////////////////////////////////////////////////////////////////////////////
 
-static void GetLine(v3s16 nmin, v3s16 nmax, PcgRandom *pr,
+static bool GetLine(v3s16 nmin, v3s16 nmax, PcgRandom *pr,
    short length, short length_rnd, float theta, float theta_rnd,
    v3f &start, v3f &dirv)
 /*
@@ -521,13 +520,17 @@ static void GetLine(v3s16 nmin, v3s16 nmax, PcgRandom *pr,
 	v3f dir_nv ( sin(dpha)*cos(dtha), sin(dpha)*sin(dtha), cos(dpha) );
 	dirv = dir_nv * lena;
 	//*select start point*
-	start.X = pr->range(nmin.X, nmax.X +1 -dirv.X);
-	start.Y = pr->range(nmin.Y, nmax.Y +1 -dirv.Y);
+	nmax.X -= dirv.X -1;
+	nmax.Y -= dirv.Y -1;
 	if(dirv.Z>0)
-		{start.Z = pr->range(nmin.Z, nmax.Z +1 -dirv.Z);}
+		{nmax.Z -= dirv.Z -1;}
 		else
-		{start.Z = pr->range(nmin.Z -dirv.Z, nmax.Z +1);}
-	return;
+		{nmin.Z -= dirv.Z -1;}
+	if((nmin.X>nmax.X)||(nmin.Y>nmax.Y)||(nmin.Z>nmax.Z)) return false;
+	start.X = pr->range(nmin.X, nmax.X);
+	start.Y = pr->range(nmin.Y, nmax.Y);
+	start.Z = pr->range(nmin.Z, nmax.Z);
+	return true;
 }
 
 void OrePipe::placePipe(struct OreEnv env,
@@ -588,12 +591,12 @@ void OrePipe::placePipe(struct OreEnv env,
 			volume++;
 		}
   }
-  printf("no of sub-dists in this %s pipe dist %u volume: %lu\n",name.c_str(),volume,sub_ores.size());
+  //printf("no of sub-dists in this %s pipe dist %u volume: %lu\n",name.c_str(),volume,sub_ores.size());
   for (auto it = sub_ores.begin() ; it != sub_ores.end(); ++it)
   {
 		OreSub &sub = **it;
 		u32 gencnt = GetOreGenCount(env,volume,sub.clust_scarcity);
-		printf("this pipe dist: %u of %s\n",gencnt,sub.name.c_str());
+		//printf("this pipe dist: %u of %s\n",gencnt,sub.name.c_str());
 		for(;gencnt>0;gencnt--)
 		{
 			float t = ((float)env.pr->next()/(env.pr->RANDOM_RANGE));
@@ -628,10 +631,10 @@ void OrePipe::generate(struct OreEnv env)
     v3f A, B, C, dirv;
 
     //*select start and direction vectors*
-    //FIXME: ensure min<max !
+    if(!
     GetLine(env.nmin, env.nmax, env.pr,
 		   pipe_length, pipe_length_rnd, dir_theta, dir_theta_rnd,
-       A, dirv);
+       A, dirv)) break; //or continue?
 
 		//*calc end of pipe*
 		B = A + dirv;
@@ -650,7 +653,7 @@ void OrePipe::generate(struct OreEnv env)
 				continue;
 		}
 
-    printf("place (%.0f,%.0f,%.0f),(%.0f,%.0f,%.0f),(%.0f,%.0f,%.0f)\n",A.X,A.Y,A.Z,C.X,C.Y,C.Z,B.X,B.Y,B.Z);
+    //printf("place (%.0f,%.0f,%.0f),(%.0f,%.0f,%.0f),(%.0f,%.0f,%.0f)\n",A.X,A.Y,A.Z,C.X,C.Y,C.Z,B.X,B.Y,B.Z);
     placePipe(env, A, B, C);
 	}
 	tt.stop(false);

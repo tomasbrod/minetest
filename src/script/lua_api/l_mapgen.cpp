@@ -1155,7 +1155,8 @@ int ModApiMapgen::l_register_ore(lua_State *L)
 		case ORE_SUB_SCATTER: {
 			OreScatter *oresub = (OreScatter *)ore;
       ObjDefHandle ph = getintfield_default(L, index, "parent", OBJDEF_INVALID_HANDLE);
-      printf("parent handle %d\n",ph);
+      //TODO
+      //use scatter, but cast to OreSub
       assert(ph!=OBJDEF_INVALID_HANDLE);
       Ore *parent = (Ore*)oremgr->get(ph);
       assert(parent);
@@ -1172,7 +1173,6 @@ int ModApiMapgen::l_register_ore(lua_State *L)
 		delete ore;
 		return 0;
 	}
-  printf("handle %d\n",handle);
 
 	ore->m_nodenames.push_back(getstringfield_default(L, index, "ore", ""));
 
