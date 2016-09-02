@@ -45,6 +45,7 @@ enum OreType {
 	ORE_BLOB,
 	ORE_VEIN,
   ORE_PIPE,
+  ORE_LAYER,   //solid ore min..max (affected by noise and biome)
   ORE_SUB_SCATTER,
 };
 
@@ -171,6 +172,12 @@ public:
 	virtual void generate(struct OreEnv env);
 };
 
+class OreLayer : public Ore {
+public:
+	static const bool NEEDS_NOISE = false;
+
+	virtual void generate(struct OreEnv env);
+};
 
 class OreManager : public ObjDefManager {
 public:
@@ -197,6 +204,8 @@ public:
 			return new OreVein;
 		case ORE_PIPE:
 			return new OrePipe;
+		case ORE_LAYER:
+			return new OreLayer;
 		case ORE_SUB_SCATTER:
 			return new OreScatter;
 		default:

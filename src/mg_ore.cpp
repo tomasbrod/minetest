@@ -660,3 +660,44 @@ void OrePipe::generate(struct OreEnv env)
 }
 
 ///////////////////////////////////////////////////////////////////////////////
+
+
+void OreLayer::generate(struct OreEnv env)
+{
+	PcgRandom pr(env.blockseed + 873);
+	MapNode n_ore(c_ore, 0, ore_param2);
+
+	if (flags & OREFLAG_USE_NOISE) {
+		if (!noise) {
+			noise = new Noise(&np, 0, env.size.X, env.size.Z);
+		}
+		noise->seed = env.mapseed;
+		noise->perlinMap2D(env.nmin.X, env.nmin.Z);
+	}
+
+	size_t index = 0;
+	for (int z = env.nmin.Z; z <= env.nmax.Z; z++)
+	for (int x = env.nmin.X; x <= env.nmax.X; x++, index++) {
+
+		if ((flags & OREFLAG_USE_NOISE)&&(noise->result[index] < 0))
+			continue;
+
+		if (env.biomemap && !biomes.empty()) {
+			std::set<u8>::iterator it = biomes.find(env.biomemap[index]);
+			if (it == biomes.end())
+				continue;
+		}
+
+		for (int y = env.nmin.Y; y <= env.nmax.Y; y++) {
+			u32 i = env.vm->m_area.index(x, y, z);
+			if (!env.vm->m_area.contains(i))
+				continue;
+			if (!CONTAINS(c_wherein, env.vm->m_data[i].getContent()))
+				continue;
+
+			env.vm->m_data[i] = n_ore;
+		}
+	}
+}
+
+///////////////////////////////////////////////////////////////////////////////

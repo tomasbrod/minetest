@@ -74,6 +74,7 @@ struct EnumString ModApiMapgen::es_OreType[] =
 	{ORE_BLOB,    "blob"},
 	{ORE_VEIN,    "vein"},
 	{ORE_PIPE,    "pipe"},
+	{ORE_LAYER,    "layer"},
 	{ORE_SUB_SCATTER,    "sub-scatter"},
 	{0, NULL},
 };
