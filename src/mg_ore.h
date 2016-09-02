@@ -50,6 +50,18 @@ enum OreType {
 
 extern FlagDesc flagdesc_ore[];
 
+struct OreEnv {
+  MMVManip *vm;
+  int mapseed;
+  u32 blockseed;
+	v3s16 nmin;
+  v3s16 nmax;
+  v3s16 size;
+  u32 volume;
+  u8 *biomemap;
+  PcgRandom *pr;
+};
+
 class OreSub;
 class Ore : public ObjDef, public NodeResolver {
 public:
@@ -76,8 +88,7 @@ public:
 	virtual void resolveNodeNames();
 
 	size_t placeOre(Mapgen *mg, u32 blockseed, v3s16 nmin, v3s16 nmax);
-	virtual void generate(MMVManip *vm, int mapseed, u32 blockseed,
-		v3s16 nmin, v3s16 nmax, u8 *biomemap) = 0;
+	virtual void generate(struct OreEnv env) = 0;
 };
 
 class OreSub : public Ore {
@@ -85,20 +96,15 @@ public:
 	OreSub();
 	Ore *parent;
 	virtual void resolveNodeNames();
-  virtual void place(MMVManip *vm, int mapseed, u8 *biomemap,
-    v3s16 nmin, v3s16 nmax, PcgRandom &pr,
-    v3s16 pA) = 0;
+  virtual void place(struct OreEnv env, v3s16 pA) = 0;
 };
 
 class OreScatter : public OreSub {
 public:
 	static const bool NEEDS_NOISE = false;
 
-	virtual void generate(MMVManip *vm, int mapseed, u32 blockseed,
-		v3s16 nmin, v3s16 nmax, u8 *biomemap);
-  virtual void place(MMVManip *vm, int mapseed, u8 *biomemap,
-    v3s16 nmin, v3s16 nmax, PcgRandom &pr,
-    v3s16 pA);
+	virtual void generate(struct OreEnv env);
+  virtual void place(struct OreEnv env, v3s16 pA);
 };
 
 class OreSheet : public Ore {
@@ -109,8 +115,7 @@ public:
 	u16 column_height_max;
 	float column_midpoint_factor;
 
-	virtual void generate(MMVManip *vm, int mapseed, u32 blockseed,
-		v3s16 nmin, v3s16 nmax, u8 *biomemap);
+	virtual void generate(struct OreEnv env);
 };
 
 class OrePuff : public Ore {
@@ -125,16 +130,14 @@ public:
 	OrePuff();
 	virtual ~OrePuff();
 
-	virtual void generate(MMVManip *vm, int mapseed, u32 blockseed,
-		v3s16 nmin, v3s16 nmax, u8 *biomemap);
+	virtual void generate(struct OreEnv env);
 };
 
 class OreBlob : public Ore {
 public:
 	static const bool NEEDS_NOISE = true;
 
-	virtual void generate(MMVManip *vm, int mapseed, u32 blockseed,
-		v3s16 nmin, v3s16 nmax, u8 *biomemap);
+	virtual void generate(struct OreEnv env);
 };
 
 class OreVein : public Ore {
@@ -147,8 +150,7 @@ public:
 	OreVein();
 	virtual ~OreVein();
 
-	virtual void generate(MMVManip *vm, int mapseed, u32 blockseed,
-		v3s16 nmin, v3s16 nmax, u8 *biomemap);
+	virtual void generate(struct OreEnv env);
 };
 
 class OrePipe : public Ore {
@@ -156,20 +158,19 @@ public:
 	static const bool NEEDS_NOISE = false;
 
 	s16 pipe_radius;   // radius of pipe in nodes
-  float pipe_length;   // min distance A-B
-  float pipe_length_rnd; // add 0..this to length
+  s16 pipe_length;   // min distance A-B
+  s16 pipe_length_rnd; // add 0..this to length
   float dir_theta;   // min inclination in radians
   float dir_theta_rnd; // add 0..this to theta
   float curving; // 0 is strait line
 
   //clusters todo
 
-  void placePipe(MMVManip *vm, int mapseed, u8 *biomemap,
-    v3s16 nmin, v3s16 nmax, PcgRandom &pr,
+  void placePipe(struct OreEnv env,
     v3f pA, v3f pB, v3f pC);
-	virtual void generate(MMVManip *vm, int mapseed, u32 blockseed,
-		v3s16 nmin, v3s16 nmax, u8 *biomemap);
+	virtual void generate(struct OreEnv env);
 };
+
 
 class OreManager : public ObjDefManager {
 public:
