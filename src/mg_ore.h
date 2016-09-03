@@ -64,7 +64,6 @@ struct OreEnv {
   PcgRandom *pr;
 };
 
-class OreSub;
 class Ore : public ObjDef, public NodeResolver {
 public:
 	static const bool NEEDS_NOISE = false;
@@ -80,9 +79,10 @@ public:
 	u32 flags;          // attributes for this ore
 	float nthresh;      // threshold for noise at which an ore is placed
 	NoiseParams np;     // noise for distribution of clusters (NULL for uniform scattering)
-	Noise *noise;
+	Noise *noise;       //FIXME how is this Thread Safe? #MT
 	std::set<u8> biomes;
-	std::vector<OreSub*> sub_ores;
+	std::vector<Ore*> sub_ores;
+	Ore *parent;
 
 	Ore();
 	virtual ~Ore();
@@ -90,23 +90,17 @@ public:
 	virtual void resolveNodeNames();
 
 	size_t placeOre(Mapgen *mg, u32 blockseed, v3s16 nmin, v3s16 nmax);
-	virtual void generate(struct OreEnv env) = 0;
+	virtual void generate(struct OreEnv env);
+  virtual void GenSingle(struct OreEnv env, v3s16 pA);
+  u32 GetOreGenCount(PcgRandom *pr,u32 volume,u32 scarcity);
 };
 
-class OreSub : public Ore {
-public:
-	OreSub();
-	Ore *parent;
-	virtual void resolveNodeNames();
-  virtual void place(struct OreEnv env, v3s16 pA) = 0;
-};
-
-class OreScatter : public OreSub {
+class OreScatter : public Ore {
 public:
 	static const bool NEEDS_NOISE = false;
 
 	virtual void generate(struct OreEnv env);
-  virtual void place(struct OreEnv env, v3s16 pA);
+  virtual void GenSingle(struct OreEnv env, v3s16 pA);
 };
 
 class OreSheet : public Ore {

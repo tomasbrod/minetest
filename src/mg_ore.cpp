@@ -22,6 +22,15 @@ file contains.
 
 Ore spawning algorithms and OreManager.
 
+OreManager::placeAllOres for each registered ore calls Ore::placeOre,
+which does some checks and calls Ore::generate
+which is responsible for spawing all ores of that type in mapblock
+can call Ore::GenSingle
+which spawns single cluster of the ore
+
+Sub ores spawn only near or inside their parent ore.
+Sub Ores generate in GenSingle method.
+
 */
 
 #include "mg_ore.h"
@@ -83,39 +92,51 @@ Ore::Ore()
 {
 	flags = 0;
 	noise = NULL;
+	parent = NULL;
 }
 
 
 Ore::~Ore()
 {
 	delete noise;
+	//FIXME delete biomes?
 }
 
 
 void Ore::resolveNodeNames()
+/*
+	Called by NodeDefManager. Read resolved content ids.
+	On sub ores replace wherein by parent's wherein and add parent's ore.
+*/
 {
 	getIdFromNrBacklog(&c_ore, "", CONTENT_AIR);
 	getIdsFromNrBacklog(&c_wherein);
-}
-
-OreSub::OreSub()
-{
-	parent=NULL;
-}
-void OreSub::resolveNodeNames()
-{
 	if(parent)
 	{
-		getIdFromNrBacklog(&c_ore, "", CONTENT_AIR);
+		//delete c_wherein?
 		c_wherein=parent->c_wherein;
 		c_wherein.push_back(parent->c_ore);
+		//FIXME delete biomes?
 		biomes=parent->biomes;
 	}
-	else Ore::resolveNodeNames();
+}
+
+void Ore::generate(struct OreEnv env)
+{
+	return; //do nothing in case this is sub- only ore
+}
+void Ore::GenSingle(struct OreEnv env, v3s16 pA)
+{
+	return; //do nothing in case this has no sub- mode
 }
 
 size_t Ore::placeOre(Mapgen *mg, u32 blockseed, v3s16 nmin, v3s16 nmax)
+/*
+	Basically call generate method. But not on sub ores.
+	Check y_min/max constraints, negate if using absheight
+*/
 {
+	if(parent) return 0;
 	int in_range = 0;
 	struct OreEnv env;
 
@@ -137,6 +158,7 @@ size_t Ore::placeOre(Mapgen *mg, u32 blockseed, v3s16 nmin, v3s16 nmax)
 		return 0;
 	nmin.Y = actual_ymin;
 	nmax.Y = actual_ymax;
+	//FIXME move env initialization to placeAllOres
 	env.vm=mg->vm;
   env.mapseed=mg->seed;
   env.blockseed=blockseed;
@@ -156,21 +178,25 @@ size_t Ore::placeOre(Mapgen *mg, u32 blockseed, v3s16 nmin, v3s16 nmax)
 	return 1;
 }
 
-static u32 GetOreGenCount(struct OreEnv &env, u32 volume,u32 scarcity)
+u32 Ore::GetOreGenCount(PcgRandom *pr,u32 volume,u32 scarcity)
 /*
 	Calculate ore clusters count in given volume
 	Random contribution is <0;1)
 */
 {
 	float gencnt_raw = (float)volume / (float)scarcity;
-  u32 gencnt = ((float)(gencnt_raw) + (float)((((float)env.pr->next())/((float)env.pr->RANDOM_RANGE))));
+  u32 gencnt = ((float)(gencnt_raw) + (float)((((float)pr->next())/((float)pr->RANDOM_RANGE))));
   return gencnt;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
 
-void OreScatter::place(struct OreEnv env, v3s16 pA)
+void OreScatter::GenSingle(struct OreEnv env, v3s16 pA)
+/*
+	Generate cluster of ore. Cube of clust_size with only some
+	nodes ore.
+*/
 {
 	MapNode n_ore(c_ore, 0, ore_param2);
 	u32 csize     = clust_size;
@@ -204,14 +230,17 @@ void OreScatter::place(struct OreEnv env, v3s16 pA)
 }
 
 void OreScatter::generate(struct OreEnv env)
+/*
+	Place clusters randomly in mapblock
+*/
 {
-	if(parent) return;
+	if(parent) return; //redundant
 	PcgRandom pr(env.blockseed);
 	env.pr=&pr;
 	
 	MapNode n_ore(c_ore, 0, ore_param2);
 	u32 csize     = clust_size;
-	u32 nclusters = GetOreGenCount(env,env.volume,clust_scarcity);
+	u32 nclusters = GetOreGenCount(env.pr,env.volume,clust_scarcity);
 
 	for (u32 i = 0; i != nclusters; i++) {
 		int x0 = pr.range(env.nmin.X, env.nmax.X - csize + 1);
@@ -222,7 +251,7 @@ void OreScatter::generate(struct OreEnv env)
 			(NoisePerlin3D(&np, x0, y0, z0, env.mapseed) < nthresh))
 			continue;
 
-		place(env,v3s16(x0,y0,z0));
+		GenSingle(env,v3s16(x0,y0,z0));
 	}
 }
 
@@ -424,15 +453,15 @@ void OreBlob::generate(struct OreEnv env)
 		}
 		for (auto it = sub_ores.begin() ; it != sub_ores.end(); ++it)
 		{
-			OreSub &sub = **it;
-			u32 gencnt = GetOreGenCount(env,csize*csize*csize,sub.clust_scarcity);
+			Ore &sub = **it;
+			u32 gencnt = GetOreGenCount(env.pr,csize*csize*csize,sub.clust_scarcity);
 			for(;gencnt>0;gencnt--)
 			{
 				v3s16 p;
 				p.X=pr.range(csize)+x0;
 				p.Y=pr.range(csize)+y0;
 				p.Z=pr.range(csize)+z0;
-				sub.place(env,p);
+				sub.GenSingle(env,p);
 			}
 		}
 	}
@@ -511,6 +540,7 @@ static bool GetLine(v3s16 nmin, v3s16 nmax, PcgRandom *pr,
    v3f &start, v3f &dirv)
 /*
 	Calculate random line inside nmin..nmax
+	resuli is start(point) and dirv(vector)
 */
 {
 	//*select r, theta, phi*
@@ -520,6 +550,7 @@ static bool GetLine(v3s16 nmin, v3s16 nmax, PcgRandom *pr,
 	v3f dir_nv ( sin(dpha)*cos(dtha), sin(dpha)*sin(dtha), cos(dpha) );
 	dirv = dir_nv * lena;
 	//*select start point*
+    //FIXME: ensure min<max !
 	nmax.X -= dirv.X -1;
 	nmax.Y -= dirv.Y -1;
 	if(dirv.Z>0)
@@ -537,7 +568,6 @@ void OrePipe::placePipe(struct OreEnv env,
    v3f pA, v3f pB, v3f pC)
 /*
 	Spawn a single "pipe" between points A and B with control point C
-  $hint is nmin and nmax value in in vm object?
 */
 {
 	TimeTaker tt ("OrePipe place pipe with all sub-dists",NULL,PRECISION_MICRO);
@@ -594,8 +624,8 @@ void OrePipe::placePipe(struct OreEnv env,
   //printf("no of sub-dists in this %s pipe dist %u volume: %lu\n",name.c_str(),volume,sub_ores.size());
   for (auto it = sub_ores.begin() ; it != sub_ores.end(); ++it)
   {
-		OreSub &sub = **it;
-		u32 gencnt = GetOreGenCount(env,volume,sub.clust_scarcity);
+		Ore &sub = **it;
+		u32 gencnt = GetOreGenCount(env.pr,volume,sub.clust_scarcity);
 		//printf("this pipe dist: %u of %s\n",gencnt,sub.name.c_str());
 		for(;gencnt>0;gencnt--)
 		{
@@ -603,7 +633,7 @@ void OrePipe::placePipe(struct OreEnv env,
 			p  = pA * ((1-t)*(1-t));
       p += pC * (2*t*(1-t));
       p += pB * (t*t);
-			sub.place(env,
+			sub.GenSingle(env,
 				v3s16(p.X+env.pr->range(-pipe_radius,+pipe_radius),
 				   p.Y+env.pr->range(-pipe_radius,+pipe_radius),
 				   p.Z+env.pr->range(-pipe_radius,+pipe_radius)
@@ -625,7 +655,7 @@ void OrePipe::generate(struct OreEnv env)
 	TimeTaker tt ("OrePipe generate",NULL,PRECISION_MICRO);
 
 	//*calc count of pipes in this block*
-  u32 gencnt = GetOreGenCount(env,env.volume,clust_scarcity);
+  u32 gencnt = GetOreGenCount(env.pr,env.volume,clust_scarcity);
   //printf("gencnt: %d..%d %d\n", nmin.X,nmax.X, gencnt);
 	for (u32 i = 0; i != gencnt; i++) {
     v3f A, B, C, dirv;
@@ -663,6 +693,10 @@ void OrePipe::generate(struct OreEnv env)
 
 
 void OreLayer::generate(struct OreEnv env)
+/*
+	Solid layer of ore between y_min and y_max,
+	respects biomes and noise.
+*/
 {
 	PcgRandom pr(env.blockseed + 873);
 	MapNode n_ore(c_ore, 0, ore_param2);
@@ -724,7 +758,6 @@ void OreRegion::resolveNodeNames()
 	Ore::resolveNodeNames();
 	if(c_ore2==CONTENT_IGNORE) c_ore2=c_ore;
 	if(c_ore3==CONTENT_IGNORE) c_ore3=c_ore2;
-	printf("Region ore initialized\n");
 }
 
 void OreRegion::generate(struct OreEnv env)
@@ -752,7 +785,6 @@ void OreRegion::generate(struct OreEnv env)
 	noise_b->perlinMap2D(env.nmin.X, env.nmin.Z);
 
 	size_t index = 0;
-	printf("Region ore generating\n");
 	for (int z = env.nmin.Z; z <= env.nmax.Z; z++)
 	for (int x = env.nmin.X; x <= env.nmax.X; x++, index++) {
 
@@ -766,7 +798,7 @@ void OreRegion::generate(struct OreEnv env)
 		if(noise_a->result[index]>0) region|=2;
 		if(noise_b->result[index]>0) region|=1;
 
-		//todo use noise for y (min=min+nv, max=max-nv)?
+		//TODO use noise for y (min=min+nv, max=max-nv)?
 
 		for (int y = env.nmin.Y; y <= env.nmax.Y; y++) {
 			u32 i = env.vm->m_area.index(x, y, z);
