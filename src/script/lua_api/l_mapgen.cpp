@@ -74,7 +74,8 @@ struct EnumString ModApiMapgen::es_OreType[] =
 	{ORE_BLOB,    "blob"},
 	{ORE_VEIN,    "vein"},
 	{ORE_PIPE,    "pipe"},
-	{ORE_LAYER,    "layer"},
+	{ORE_LAYER,   "layer"},
+	{ORE_REGION,  "region"},
 	{ORE_SUB_SCATTER,    "sub-scatter"},
 	{0, NULL},
 };
@@ -1151,6 +1152,16 @@ int ModApiMapgen::l_register_ore(lua_State *L)
 				"pipe_length_rnd", 2.0f);
 			orepipe->curving = getfloatfield_default(L, index,
 				"curving", 2.0f);
+      break;
+		}
+		case ORE_REGION: {
+      OreRegion *orep = (OreRegion *)ore;
+      lua_getfield(L, index, "np_region");
+      read_noiseparams(L, -1, &orep->np_region);
+      lua_pop(L, 1);
+      ore->m_nodenames.push_back(getstringfield_default(L, index, "ore2", ""));
+      ore->m_nodenames.push_back(getstringfield_default(L, index, "ore3", ""));
+      ore->m_nodenames.push_back(getstringfield_default(L, index, "ore4", ""));
       break;
 		}
 		case ORE_SUB_SCATTER: {

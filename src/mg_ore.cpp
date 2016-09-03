@@ -701,3 +701,85 @@ void OreLayer::generate(struct OreEnv env)
 }
 
 ///////////////////////////////////////////////////////////////////////////////
+
+OreRegion::OreRegion() :
+	Ore()
+{
+	noise_a = NULL;
+	noise_b = NULL;
+}
+
+
+OreRegion::~OreRegion()
+{
+	delete noise_b;
+	delete noise_a;
+}
+
+void OreRegion::resolveNodeNames()
+{
+	getIdFromNrBacklog(&c_ore2, "", CONTENT_IGNORE);
+	getIdFromNrBacklog(&c_ore3, "", CONTENT_IGNORE);
+	getIdFromNrBacklog(&c_ore4, "", c_ore2);
+	Ore::resolveNodeNames();
+	if(c_ore2==CONTENT_IGNORE) c_ore2=c_ore;
+	if(c_ore3==CONTENT_IGNORE) c_ore3=c_ore2;
+	printf("Region ore initialized\n");
+}
+
+void OreRegion::generate(struct OreEnv env)
+{
+	PcgRandom pr(env.blockseed + 873);
+	MapNode n_ore[4]={
+		MapNode(c_ore,  0, ore_param2),
+		MapNode(c_ore2, 0, ore_param2),
+		MapNode(c_ore3, 0, ore_param2),
+		MapNode(c_ore4, 0, ore_param2)
+	};
+
+	if (flags & OREFLAG_USE_NOISE) {
+		if (!noise) {
+			noise = new Noise(&np, 0, env.size.X, env.size.Z);
+		}
+		noise->seed = env.mapseed;
+		noise->perlinMap2D(env.nmin.X, env.nmin.Z);
+	}
+	if(!noise_a) { //this is not a good solution
+		noise_a = new Noise(&np_region, 0, env.size.X, env.size.Z);
+		noise_b = new Noise(&np_region, 7782, env.size.X, env.size.Z);
+	}
+	noise_a->perlinMap2D(env.nmin.X, env.nmin.Z);
+	noise_b->perlinMap2D(env.nmin.X, env.nmin.Z);
+
+	size_t index = 0;
+	printf("Region ore generating\n");
+	for (int z = env.nmin.Z; z <= env.nmax.Z; z++)
+	for (int x = env.nmin.X; x <= env.nmax.X; x++, index++) {
+
+		if (env.biomemap && !biomes.empty()) {
+			std::set<u8>::iterator it = biomes.find(env.biomemap[index]);
+			if (it == biomes.end())
+				continue;
+		}
+
+		unsigned short region=0;
+		if(noise_a->result[index]>0) region|=2;
+		if(noise_b->result[index]>0) region|=1;
+
+		//todo use noise for y (min=min+nv, max=max-nv)?
+
+		for (int y = env.nmin.Y; y <= env.nmax.Y; y++) {
+			u32 i = env.vm->m_area.index(x, y, z);
+
+			if (!env.vm->m_area.contains(i))
+				continue;
+			if (!CONTAINS(c_wherein, env.vm->m_data[i].getContent()))
+				continue;
+
+			env.vm->m_data[i] = n_ore[region];
+
+		}
+	}
+}
+
+///////////////////////////////////////////////////////////////////////////////
